@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>감정 교류하는 로봇</title>
+<meta name="description" content="라즈봇2 감정 교류 로봇 발표 자료">
+<style>
+  :root { --bg: #16131a; --bar: rgba(30, 26, 36, .92); --ink: #fff; --muted: #b9b3c2; --accent: #ff8a65; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
+    font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif; overflow: hidden; }
+  button { font: inherit; color: inherit; }
+
+  /* ---------- 슬라이드 무대 (16:9 꽉 맞춤) ---------- */
+  #stage { position: fixed; inset: 0 0 var(--barH, 52px) 0; display: grid; place-items: center; touch-action: pan-y; }
+  body.bare #stage { inset: 0; }
+  #slide { position: relative; width: min(100vw, calc((100vh - var(--barH, 52px)) * 16 / 9)); aspect-ratio: 16 / 9;
+    background: #fff center / cover no-repeat; box-shadow: 0 10px 40px rgba(0,0,0,.45); }
+  body.bare #slide { width: min(100vw, calc(100vh * 16 / 9)); box-shadow: none; }
+  #slide video { position: absolute; object-fit: contain; background: #000; cursor: pointer; }
+  .play { position: absolute; display: grid; place-items: center; pointer-events: none; transition: opacity .2s; }
+  .play span { width: clamp(44px, 7vw, 88px); aspect-ratio: 1; border-radius: 50%; background: rgba(0,0,0,.55);
+    display: grid; place-items: center; font-size: clamp(18px, 3vw, 38px); padding-left: .15em; }
+  .play.hide { opacity: 0; }
+
+  /* ---------- 아래 막대 ---------- */
+  #bar { position: fixed; left: 0; right: 0; bottom: 0; height: 52px; display: flex; align-items: center; gap: 6px;
+    padding: 0 10px; background: var(--bar); backdrop-filter: blur(8px); transition: transform .25s; z-index: 5; }
+  body.bare #bar { transform: translateY(100%); }
+  body.bare.peek #bar { transform: none; }
+  #bar button { background: none; border: 0; min-width: 40px; height: 40px; border-radius: 10px; cursor: pointer; font-size: 15px; padding: 0 10px; }
+  #bar button:hover, #bar button:focus-visible { background: rgba(255,255,255,.12); outline: none; }
+  #bar a { color: inherit; text-decoration: none; font-size: 14px; padding: 9px 10px; border-radius: 10px; }
+  #bar a:hover { background: rgba(255,255,255,.12); }
+  #count { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 14px; min-width: 56px; text-align: center; }
+  #progress { position: fixed; left: 0; bottom: 52px; height: 3px; background: var(--accent); transition: width .25s; z-index: 6; }
+  body.bare #progress { bottom: 0; }
+  .grow { flex: 1; }
+  @media (max-width: 640px) { .wide { display: none; } }
+
+  /* ---------- 발표자 노트 ---------- */
+  #notes { position: fixed; left: 50%; bottom: 64px; transform: translateX(-50%); width: min(820px, calc(100vw - 24px));
+    max-height: 34vh; overflow: auto; background: var(--bar); border-radius: 14px; padding: 14px 18px; line-height: 1.65;
+    font-size: 16px; white-space: pre-wrap; z-index: 6; box-shadow: 0 8px 30px rgba(0,0,0,.4); }
+
+  /* ---------- 한눈에 보기 ---------- */
+  #grid { position: fixed; inset: 0; background: rgba(16,13,20,.96); z-index: 10; overflow: auto; padding: 24px 16px 40px; }
+  #grid .wrap { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+  #grid button { position: relative; padding: 0; border: 3px solid transparent; border-radius: 10px; overflow: hidden; background: #000; cursor: pointer; }
+  #grid button.on { border-color: var(--accent); }
+  #grid img { display: block; width: 100%; aspect-ratio: 16/9; }
+  #grid b { position: absolute; left: 6px; top: 6px; background: rgba(0,0,0,.65); border-radius: 6px; padding: 1px 8px; font-size: 13px; }
+
+  /* ---------- 발표자 보기 (?presenter) ---------- */
+  body.presenter { overflow: auto; }
+  body.presenter #stage, body.presenter #progress { display: none; }
+  #pv { display: none; }
+  body.presenter #pv { display: grid; grid-template-columns: 1.6fr 1fr; grid-template-rows: auto 1fr; gap: 16px; padding: 16px; height: calc(100vh - 52px); }
+  #pv .cur img, #pv .nxt img { width: 100%; border-radius: 8px; display: block; background: #fff; }
+  #pv h2 { margin: 0 0 8px; font-size: 14px; color: var(--muted); font-weight: 600; }
+  #pv .side { display: flex; flex-direction: column; gap: 16px; min-height: 0; }
+  #pv .clock { font-size: 34px; font-variant-numeric: tabular-nums; font-weight: 700; }
+  #pv .clock small { font-size: 15px; color: var(--muted); font-weight: 400; margin-left: 8px; }
+  #pv .pnotes { grid-column: 1 / -1; background: rgba(255,255,255,.06); border-radius: 12px; padding: 16px 20px;
+    font-size: 21px; line-height: 1.7; white-space: pre-wrap; overflow: auto; min-height: 0; }
+  @media (max-width: 760px) { body.presenter #pv { grid-template-columns: 1fr; height: auto; } }
+
+  .help { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,.6); z-index: 20; }
+  .help div { background: #241f2b; border-radius: 16px; padding: 22px 26px; max-width: 420px; line-height: 1.9; }
+  .help kbd { display: inline-block; min-width: 26px; text-align: center; background: #3a3342; border-radius: 6px; padding: 0 7px; margin-right: 6px; font-family: inherit; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div id="stage"><div id="slide" role="img"></div></div>
+<div id="progress"></div>
+
+<div id="pv">
+  <div class="cur"><h2>지금 슬라이드</h2><img id="pv-cur" alt=""></div>
+  <div class="side">
+    <div class="clock"><span id="pv-time">00:00</span><small id="pv-now"></small></div>
+    <div class="nxt"><h2>다음 슬라이드</h2><img id="pv-next" alt=""></div>
+    <button id="pv-reset" style="align-self:start;background:rgba(255,255,255,.1);border:0;border-radius:10px;padding:8px 14px;cursor:pointer">⏱ 시간 다시 재기</button>
+  </div>
+  <div class="pnotes" id="pv-notes"></div>
+</div>
+
+<div id="notes" hidden></div>
+<div id="grid" hidden><div class="wrap"></div></div>
+<div class="help" id="help" hidden><div>
+  <b>단축키</b><br>
+  <kbd>→</kbd><kbd>Space</kbd>다음 · <kbd>←</kbd>이전<br>
+  <kbd>F</kbd>전체 화면 · <kbd>N</kbd>발표자 노트<br>
+  <kbd>G</kbd>한눈에 보기 · <kbd>P</kbd>발표자 보기 창<br>
+  <kbd>V</kbd>영상 재생/멈춤 · <kbd>Home</kbd><kbd>End</kbd>처음/끝<br>
+  <small style="color:var(--muted)">발표 리모컨(클리커)도 그대로 써요. 화면 왼쪽·오른쪽을 눌러도 넘어가요.</small>
+</div></div>
+
+<nav id="bar">
+  <button id="prev" aria-label="이전">◀</button>
+  <span id="count">1 / 1</span>
+  <button id="next" aria-label="다음">▶</button>
+  <span class="grow"></span>
+  <button id="b-grid" title="한눈에 보기 (G)">▦<span class="wide"> 전체</span></button>
+  <button id="b-notes" title="발표자 노트 (N)">📝<span class="wide"> 노트</span></button>
+  <button id="b-presenter" class="wide" title="발표자 보기 창 (P)">🎤 발표자 보기</button>
+  <a href="deck.pptx" download="감정교류로봇_발표.pptx" class="wide" title="PowerPoint 파일 받기">⬇ PPTX</a>
+  <a href="deck.pdf" download="감정교류로봇_발표.pdf" class="wide" title="PDF 받기">⬇ PDF</a>
+  <button id="b-help" aria-label="단축키">?</button>
+  <button id="b-full" title="전체 화면 (F)">⛶</button>
+</nav>
+
+<script>
+(async () => {
+  const $ = (id) => document.getElementById(id);
+  const slides = await (await fetch("slides.json")).json();
+  const N = slides.length;
+  const presenter = new URLSearchParams(location.search).has("presenter");
+  const chan = "BroadcastChannel" in window ? new BroadcastChannel("emotion-duck-slides") : null;
+  let i = 0;
+
+  // 이미지 미리 받아 두기 (넘길 때 깜빡이지 않게)
+  slides.forEach((s) => { new Image().src = s.img; });
+
+  function readHash() {
+    const n = parseInt(location.hash.slice(1), 10);
+    return Number.isFinite(n) ? Math.min(N, Math.max(1, n)) - 1 : 0;
+  }
+
+  function render() {
+    const s = slides[i];
+    const box = $("slide");
+    box.querySelectorAll("video").forEach((v) => v.pause());
+    box.replaceChildren();
+    box.style.backgroundImage = `url("${s.img}")`;
+    box.setAttribute("aria-label", `슬라이드 ${i + 1}`);
+    s.videos.forEach((v) => {
+      const pos = `left:${v.x}%;top:${v.y}%;width:${v.w}%;height:${v.h}%`;
+      const el = document.createElement("video");
+      el.src = v.src; el.preload = "metadata"; el.playsInline = true; el.style.cssText = pos;
+      const badge = document.createElement("div");
+      badge.className = "play"; badge.style.cssText = pos; badge.innerHTML = "<span>▶</span>";
+      el.addEventListener("click", (e) => { e.stopPropagation(); el.paused ? el.play() : el.pause(); });
+      el.addEventListener("play", () => { badge.classList.add("hide"); el.controls = true; });
+      el.addEventListener("pause", () => badge.classList.remove("hide"));
+      box.append(el, badge);
+    });
+    $("count").textContent = `${i + 1} / ${N}`;
+    $("progress").style.width = `${((i + 1) / N) * 100}%`;
+    $("notes").textContent = s.notes || "(노트 없음)";
+    $("prev").disabled = i === 0; $("next").disabled = i === N - 1;
+    document.querySelectorAll("#grid button").forEach((b, k) => b.classList.toggle("on", k === i));
+    if (presenter) {
+      $("pv-cur").src = s.img;
+      $("pv-next").src = slides[Math.min(N - 1, i + 1)].img;
+      $("pv-next").style.opacity = i === N - 1 ? 0.3 : 1;
+      $("pv-notes").textContent = s.notes || "(노트 없음)";
+    }
+    if (location.hash !== `#${i + 1}`) history.replaceState(null, "", `#${i + 1}`);
+  }
+
+  function go(n, from) {
+    n = Math.min(N - 1, Math.max(0, n));
+    if (n === i && from !== "init") return;
+    i = n; render();
+    if (chan && from !== "remote") chan.postMessage({ slide: i });
+  }
+  chan && chan.addEventListener("message", (e) => {
+    if (typeof e.data.slide === "number") go(e.data.slide, "remote");
+    if (e.data.video) toggleVideo(false);
+  });
+
+  function toggleVideo(send = true) {
+    const v = $("slide").querySelector("video");
+    if (v) v.paused ? v.play() : v.pause();
+    if (send && presenter && chan) chan.postMessage({ video: true });
+  }
+  function fullscreen() {
+    document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.();
+  }
+
+  // ---------- 한눈에 보기 ----------
+  $("grid").firstElementChild.append(...slides.map((s, k) => {
+    const b = document.createElement("button");
+    b.innerHTML = `<img src="${s.img}" alt="" loading="lazy"><b>${k + 1}</b>`;
+    b.addEventListener("click", () => { go(k); $("grid").hidden = true; });
+    return b;
+  }));
+  const toggle = (id) => { $(id).hidden = !$(id).hidden; };
+
+  // ---------- 조작 ----------
+  $("prev").onclick = () => go(i - 1);
+  $("next").onclick = () => go(i + 1);
+  $("b-grid").onclick = () => toggle("grid");
+  $("b-notes").onclick = () => toggle("notes");
+  $("b-help").onclick = () => toggle("help");
+  $("help").onclick = () => toggle("help");
+  $("b-full").onclick = fullscreen;
+  $("b-presenter").onclick = () => window.open(`?presenter#${i + 1}`, "presenter", "width=1200,height=800");
+  $("stage").addEventListener("click", (e) => {
+    if (e.target.closest("video")) return;
+    e.clientX > innerWidth * 0.35 ? go(i + 1) : go(i - 1);
+  });
+  let sx = null;
+  $("stage").addEventListener("touchstart", (e) => { sx = e.touches[0].clientX; }, { passive: true });
+  $("stage").addEventListener("touchend", (e) => {
+    if (sx === null) return;
+    const dx = e.changedTouches[0].clientX - sx; sx = null;
+    if (Math.abs(dx) > 50) { e.preventDefault(); go(dx < 0 ? i + 1 : i - 1); }
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const k = e.key;
+    if (["ArrowRight", "ArrowDown", "PageDown", " ", "Enter"].includes(k)) go(i + 1);
+    else if (["ArrowLeft", "ArrowUp", "PageUp", "Backspace"].includes(k)) go(i - 1);
+    else if (k === "Home") go(0);
+    else if (k === "End") go(N - 1);
+    else if (k === "f" || k === "F") fullscreen();
+    else if (k === "n" || k === "N") toggle("notes");
+    else if (k === "g" || k === "G") toggle("grid");
+    else if (k === "p" || k === "P") $("b-presenter").click();
+    else if (k === "v" || k === "V" || k === "b" || k === "B") toggleVideo();   // 리모컨의 '화면 끄기(B)' 버튼
+    else if (k === "Escape") { $("grid").hidden = true; $("help").hidden = true; return; }
+    else if (k === "?") toggle("help");
+    else return;
+    e.preventDefault();
+  });
+  addEventListener("hashchange", () => go(readHash()));
+
+  // 전체 화면에서는 아래 막대를 숨기고, 마우스를 아래로 가져가면 보인다
+  document.addEventListener("fullscreenchange", () => document.body.classList.toggle("bare", !!document.fullscreenElement));
+  document.addEventListener("mousemove", (e) => document.body.classList.toggle("peek", e.clientY > innerHeight - 70));
+
+  // ---------- 발표자 보기 ----------
+  if (presenter) {
+    document.body.classList.add("presenter");
+    document.title = "발표자 보기 · 감정 교류하는 로봇";
+    $("b-presenter").hidden = true; $("b-notes").hidden = true;
+    let t0 = Date.now();
+    $("pv-reset").onclick = () => { t0 = Date.now(); };
+    const pad = (n) => String(n).padStart(2, "0");
+    setInterval(() => {
+      const s = Math.floor((Date.now() - t0) / 1000);
+      $("pv-time").textContent = `${pad(Math.floor(s / 60))}:${pad(s % 60)}`;
+      const d = new Date(); $("pv-now").textContent = `지금 ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }, 500);
+  }
+
+  i = readHash();
+  go(i, "init");
+})();
+</script>
+</body>
+</html>
