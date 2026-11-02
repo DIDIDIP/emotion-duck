@@ -681,3 +681,10 @@ body[data-skin="night"] .who .sub, body[data-skin="night"] .name-btn span { colo
 .fetch-time b { font-size: 3.4rem; font-weight: 900; font-variant-numeric: tabular-nums; }
 .fetch-time small { font-weight: 800; color: var(--muted); }
 .fetch-msg { text-align: center; font-weight: 700; margin: 0; }
+
+/* 체험판 안내 띠 */
+.demo-bar {
+  position: sticky; top: 0; z-index: 15; text-align: center; font-size: .8rem; padding: 7px 12px;
+  background: #2a2530; color: #fff; line-height: 1.4;
+}
+.demo-bar a { color: #9be6d6; font-weight: 700; }

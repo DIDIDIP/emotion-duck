@@ -134,7 +134,7 @@ window.Play = (() => {
     const next = () => { camTimer = setTimeout(refreshCam, 700); };
     img.onload = () => { if ($("g-cam-note")) $("g-cam-note").hidden = true; next(); };
     img.onerror = () => { if ($("g-cam-note")) $("g-cam-note").hidden = false; next(); };
-    img.src = `${base}/camera.jpg?t=${Date.now()}`;
+    img.src = cameraUrl();
   }
 
   async function begin(id) {

@@ -6,7 +6,12 @@ let rpcId = 0;
 let base = "";
 try { base = localStorage.getItem("robot") || ""; } catch {}
 
+// 체험판(demo.js)이면 서버 대신 브라우저 안의 흉내 엔진에 묻는다
+const cameraUrl = () => (window.DemoServer ? DemoServer.camera() : `${base}/camera.jpg?t=${Date.now()}`);
+const scanPhotoUrl = (i, v) => (window.DemoServer ? DemoServer.photo(i) : `${base}/scan/${i}.jpg?v=${v}`);
+
 async function rpc(method, params = {}) {
+  if (window.DemoServer) return DemoServer.rpc(method, params);
   const res = await fetch(base + "/rpc", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -238,7 +243,7 @@ function refreshCamera() {
   const next = () => { camTimer = setTimeout(refreshCamera, isBusy(homeInfo) ? 400 : 1000); };
   img.onload = () => { $("cam-note").hidden = true; next(); };
   img.onerror = () => { $("cam-note").hidden = false; next(); };
-  img.src = `${base}/camera.jpg?t=${Date.now()}`;
+  img.src = cameraUrl();
 }
 $("cam-box").addEventListener("toggle", refreshCamera);
 

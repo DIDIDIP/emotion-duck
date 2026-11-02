@@ -122,7 +122,7 @@ window.MapView = (() => {
         fig.dataset.i = f.i;
         const img = document.createElement("img");
         img.alt = `${label(f.heading)} 방향 사진`;
-        if (f.photo) img.src = `${base}/scan/${f.i}.jpg?v=${info.scanned_at}`;
+        if (f.photo) img.src = scanPhotoUrl(f.i, info.scanned_at);
         const hz = document.createElement("span");
         hz.className = "horizon";
         hz.style.top = `${(0.5 - info.camera.tilt / info.camera.vfov) * 100}%`;
