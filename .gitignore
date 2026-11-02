@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+# 로봇마다 다른 진행 상황·등록 색 (저장소에 올리지 않음)
+pet.json
+home.json
+ball.json
+_t*.json
+web/_t*.html
+web/_test.html

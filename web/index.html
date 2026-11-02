@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#fbefe9">
+<title>감정 오리</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="app">
+  <!-- 위쪽: 레벨 · 이름 · 연결 -->
+  <header class="top">
+    <div class="lv-ring" id="lv-ring" aria-label="레벨">
+      <span id="lv">1</span>
+    </div>
+    <div class="who">
+      <button id="name-btn" class="name-btn" aria-label="이름 바꾸기"><b id="name">오리</b><span aria-hidden="true">✎</span></button>
+      <form id="name-form" class="name-form" hidden>
+        <label for="name-input" class="sr-only">새 이름</label>
+        <input id="name-input" maxlength="10" autocomplete="off">
+        <button class="mini">저장</button>
+      </form>
+      <span class="sub"><span id="xp-text">경험치 0/20</span></span>
+    </div>
+    <button id="closet-btn" class="icon-btn" aria-label="꾸미기">🎨<span class="dot new" id="closet-dot" hidden></span></button>
+    <button id="sound-btn" class="icon-btn" aria-label="효과음 켜기/끄기" aria-pressed="true">🔊</button>
+    <button id="conn-btn" class="icon-btn conn-btn" aria-label="기기 연결"><span class="dot" id="conn-dot"></span>📶</button>
+  </header>
+
+  <!-- 탭 -->
+  <nav class="tabs" role="tablist" aria-label="화면">
+    <button role="tab" id="tab-pet" aria-controls="view-pet" aria-selected="true">🐣 돌보기</button>
+    <button role="tab" id="tab-play" aria-controls="view-play" aria-selected="false">🎮 놀이</button>
+    <button role="tab" id="tab-map" aria-controls="view-map" aria-selected="false">🗺️ 방 지도</button>
+    <span class="tab-pill" aria-hidden="true"></span>
+  </nav>
+
+  <!-- ===================== 돌보기 ===================== -->
+  <section id="view-pet" role="tabpanel" aria-labelledby="tab-pet" class="card">
+    <p id="bubble" class="bubble" aria-live="polite">안녕! 나랑 놀자</p>
+
+    <div class="stage">
+      <button id="face" class="device" aria-label="쓰다듬기">
+        <span class="hat" id="hat" aria-hidden="true"></span>
+        <span class="ear left" aria-hidden="true"></span>
+        <span class="screen"><svg id="screen" viewBox="0 0 32 14" aria-hidden="true"></svg></span>
+        <span class="ear right" aria-hidden="true"></span>
+      </button>
+      <div id="fx" class="fx" aria-hidden="true"></div>
+    </div>
+    <p class="hint center tap-hint">화면을 톡 누르면 쓰다듬어요</p>
+
+    <p class="mood"><span id="emoji">🙂</span> <b id="label">보통</b></p>
+
+    <div class="stats">
+      <div class="stat"><span class="s-name">❤️ 행복</span><span class="bar happy"><i id="happy-bar"></i></span><span class="s-val" id="happy">0</span></div>
+      <div class="stat"><span class="s-name">⚡ 에너지</span><span class="bar energy"><i id="energy-bar"></i></span><span class="s-val" id="energy">0</span></div>
+      <div class="stat"><span class="s-name">💗 호감도</span><span class="bar aff"><i id="aff-mini-bar"></i></span><span class="s-val" id="aff-mini">0</span></div>
+    </div>
+
+    <div class="actions">
+      <button class="act snack" data-act="snack">
+        <span class="a-ico" aria-hidden="true">🍪</span><span class="a-name">간식 주기</span><span class="a-sub" id="snack-sub">오늘 3번 남음</span>
+      </button>
+      <button class="act sleep" data-act="sleep">
+        <span class="a-ico" id="sleep-ico" aria-hidden="true">🌙</span><span class="a-name" id="sleep-name">재우기</span><span class="a-sub" id="sleep-sub">에너지 회복</span>
+      </button>
+      <button class="act rps" data-act="rps" data-unlock="rps">
+        <span class="a-ico" aria-hidden="true">✊</span><span class="a-name">가위바위보</span><span class="a-sub">한 판 하자</span>
+      </button>
+      <button class="act come" data-act="come" data-unlock="come">
+        <span class="a-ico" aria-hidden="true">🏠</span><span class="a-name">이리 와</span><span class="a-sub">집으로 와요</span>
+      </button>
+    </div>
+
+    <div id="rps-pick" class="rps-pick" hidden>
+      <p>무엇을 낼까?</p>
+      <div class="hands">
+        <button data-hand="rock" aria-label="바위">✊</button>
+        <button data-hand="scissors" aria-label="가위">✌️</button>
+        <button data-hand="paper" aria-label="보">🖐</button>
+      </div>
+      <p class="muted small">카메라에 손을 보여 줘도 돼요 · <b id="rps-count">10</b>초</p>
+      <span class="rps-timer"><i id="rps-timer"></i></span>
+    </div>
+
+    <details id="cam-box" class="fold">
+      <summary>📷 카메라 화면 <span id="gesture" class="chip idle">손짓 대기</span></summary>
+      <figure class="cam">
+        <img id="cam" alt="로봇 카메라 화면">
+        <figcaption id="cam-note" hidden>카메라 없음 · 흉내 모드</figcaption>
+      </figure>
+      <p class="hint">"이리 와"용 집 표시: 진한 색 물건을 <b>가운데 네모</b>에 보이게 하고 등록하세요.</p>
+      <div class="row">
+        <button id="h-register" class="btn">이걸 집으로 등록</button>
+        <span id="h-swatch" class="swatch" hidden></span>
+        <button id="h-cancel" class="btn" hidden>멈추기</button>
+      </div>
+      <p id="h-message" class="status-msg" aria-live="polite"></p>
+      <div class="progress" aria-hidden="true"><span id="h-bar"></span></div>
+    </details>
+
+    <details id="mood-box" class="fold">
+      <summary>📈 기분 기록</summary>
+      <ul class="legend" aria-label="범례">
+        <li><i style="background:var(--s1)"></i>기분</li>
+        <li><i style="background:var(--s2)"></i>활기</li>
+        <li><i style="background:var(--s3)"></i>친밀도</li>
+      </ul>
+      <div class="chart" id="chart">
+        <svg id="chart-svg" role="img" aria-label="기분, 활기, 친밀도의 최근 5분 변화 선 그래프"></svg>
+        <div id="tip" class="tip" hidden></div>
+      </div>
+      <h3>최근 일</h3>
+      <ol id="history" class="history"></ol>
+    </details>
+  </section>
+
+  <!-- ===================== 놀이 ===================== -->
+  <section id="view-play" role="tabpanel" aria-labelledby="tab-play" class="card" hidden>
+    <div class="aff-card">
+      <div class="aff-top">
+        <div>
+          <span class="muted small" id="aff-who">오리와의 사이</span>
+          <b class="aff-title" id="aff-title">낯가림</b>
+        </div>
+        <span class="aff-num"><b id="aff-num">0</b><span>/100</span></span>
+      </div>
+      <div class="hearts" id="hearts" aria-hidden="true"></div>
+      <p class="aff-next" id="aff-next"></p>
+      <ol class="tiers" id="tiers" aria-label="호감도 단계"></ol>
+    </div>
+
+    <h3 class="play-h">로봇이랑 놀기 <span class="muted small">로봇이 직접 움직이는 놀이예요 · 놀이마다 하루 3번 호감도</span></h3>
+    <div class="games">
+      <button class="game-card mugunghwa" data-game="mugunghwa">
+        <span class="g-ico" aria-hidden="true">🌸</span>
+        <span class="g-txt"><b>무궁화 꽃이 피었습니다</b><span>로봇이 술래! 돌아볼 때 움직이면 카메라에 들켜요</span></span>
+        <span class="g-meta" data-meta="mugunghwa"></span>
+      </button>
+      <button class="game-card dance" data-game="dance">
+        <span class="g-ico" aria-hidden="true">🕺</span>
+        <span class="g-txt"><b>따라 춤추기</b><span>로봇이 바퀴·고개로 춘 춤을 순서대로 따라 해요</span></span>
+        <span class="g-meta" data-meta="dance"></span>
+      </button>
+      <button class="game-card fetch" data-game="fetch">
+        <span class="g-ico" aria-hidden="true">⚽</span>
+        <span class="g-txt"><b>공 찾아오기</b><span>공을 굴리면 로봇이 찾아서 달려가요</span></span>
+        <span class="g-meta" data-meta="fetch"></span>
+      </button>
+    </div>
+  </section>
+
+  <!-- ===================== 방 지도 ===================== -->
+  <section id="view-map" role="tabpanel" aria-labelledby="tab-map" class="card" hidden>
+    <div class="map-head">
+      <h2>우리 방</h2>
+      <span id="map-chip" class="chip idle">스캔 전</span>
+    </div>
+
+    <div id="map-empty" class="map-empty">
+      <div class="radar" aria-hidden="true"><span></span><span></span><span></span><i>🤖</i></div>
+      <p class="lead">로봇이 제자리에서 한 바퀴 돌며<br>방을 사진과 거리로 기억해요</p>
+      <ol class="mini-steps">
+        <li>로봇을 방 가운데쯤 두기</li>
+        <li><b>방 스캔하기</b> 누르기 (약 20초)</li>
+        <li>지도나 사진에서 갈 곳 누르기</li>
+      </ol>
+    </div>
+
+    <div id="map-wrap" class="map-wrap" hidden>
+      <svg id="map" class="map" role="img" aria-label="위에서 본 방 지도. 누르면 그 위치를 목표로 정해요"></svg>
+      <div class="map-legend" aria-hidden="true">
+        <span><i class="lg robot"></i>로봇</span><span><i class="lg wall"></i>벽·물건</span><span><i class="lg free"></i>갈 수 있는 곳</span>
+      </div>
+    </div>
+
+    <p id="map-target" class="map-target" aria-live="polite"></p>
+    <div class="progress" aria-hidden="true"><span id="map-bar"></span></div>
+
+    <div class="map-actions">
+      <button id="map-scan" class="btn big">🔍 방 스캔하기</button>
+      <button id="map-go" class="btn big primary" disabled>🚗 여기로 와!</button>
+      <button id="map-stop" class="btn big danger" hidden>■ 멈추기</button>
+    </div>
+
+    <div id="pano-box" hidden>
+      <h3>스캔한 사진 <span class="muted small">바닥을 눌러도 거기로 가요</span></h3>
+      <div id="pano" class="pano"></div>
+    </div>
+  </section>
+
+  <footer class="settings">
+    <label><input type="checkbox" id="voice"> 말소리 듣기</label>
+    <label><input type="checkbox" id="drive" checked> 바퀴 움직이기</label>
+  </footer>
+</main>
+
+<div id="levelup" class="levelup" hidden aria-live="assertive">
+  <div class="lu-card">
+    <span class="lu-star" aria-hidden="true">⭐</span><b id="levelup-title">Lv 2!</b><span id="levelup-sub"></span>
+    <div id="gift" class="gift" hidden>
+      <button id="gift-box" class="gift-box" aria-label="선물 상자 열기">🎁</button>
+      <p>선물이 도착했어요! 눌러서 열어 보세요</p>
+    </div>
+    <div id="gift-items" class="gift-items" hidden></div>
+    <div id="gift-actions" class="gift-actions" hidden>
+      <button id="gift-closet" class="btn">옷장 보기</button>
+      <button id="gift-wear" class="btn primary">바로 착용 ✨</button>
+    </div>
+  </div>
+</div>
+<div id="confetti" class="confetti" aria-hidden="true"></div>
+<div id="toast" class="toast" role="status" hidden></div>
+
+<dialog id="game-dlg" class="game-dlg" aria-labelledby="g-title">
+  <header class="g-head">
+    <b id="g-title">게임</b>
+    <span id="g-stat" class="g-stat"></span>
+    <button id="g-close" class="icon-btn" aria-label="게임 닫기">✕</button>
+  </header>
+  <div id="g-body" class="g-body"></div>
+</dialog>
+
+<dialog id="closet" class="sheet closet" aria-labelledby="closet-title">
+  <form method="dialog" class="sheet-head"><h2 id="closet-title">🎨 꾸미기</h2><button class="icon-btn" aria-label="닫기">✕</button></form>
+  <div class="closet-preview">
+    <div class="device preview" aria-label="미리보기">
+      <span class="hat" aria-hidden="true"></span>
+      <span class="ear left" aria-hidden="true"></span>
+      <span class="screen"><svg id="screen-prev" aria-hidden="true"></svg></span>
+      <span class="ear right" aria-hidden="true"></span>
+    </div>
+  </div>
+  <div class="slot-tabs" id="slot-tabs" role="tablist" aria-label="꾸미기 종류"></div>
+  <div class="items" id="items"></div>
+  <p class="hint center" id="closet-hint"></p>
+</dialog>
+
+<dialog id="conn-dialog" class="sheet">
+  <form method="dialog" class="sheet-head"><h2>기기 연결</h2><button class="icon-btn" aria-label="닫기">✕</button></form>
+  <dl class="facts">
+    <div><dt>연결 상태</dt><dd id="c-status">확인 중…</dd></div>
+    <div><dt>로봇</dt><dd id="c-robot">-</dd></div>
+    <div><dt>카메라</dt><dd id="c-camera">-</dd></div>
+    <div><dt>응답 속도</dt><dd id="c-ping">-</dd></div>
+  </dl>
+  <h3>휴대폰으로 열기</h3>
+  <p class="hint">휴대폰을 로봇과 <b>같은 와이파이</b>에 연결하고 카메라 앱으로 QR을 찍으세요.</p>
+  <div class="qr-wrap">
+    <div id="qr" class="qr" aria-label="접속 주소 QR 코드"></div>
+    <div><p class="url" id="c-url">-</p><button id="copy" class="btn">주소 복사</button></div>
+  </div>
+  <h3>다른 로봇에 연결</h3>
+  <form id="addr-form" class="addr">
+    <label for="addr" class="sr-only">로봇 주소</label>
+    <input id="addr" inputmode="url" placeholder="예: 192.168.0.23" autocomplete="off">
+    <button class="btn primary">연결</button>
+  </form>
+  <p class="hint">비워 두고 연결하면 이 화면을 열어 준 로봇에 연결해요.</p>
+</dialog>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="faces.js"></script>
+<script src="fx.js"></script>
+<script src="app.js"></script>
+<script src="map.js"></script>
+<script src="games.js"></script>
+<script src="closet.js"></script>
+</body>
+</html>
