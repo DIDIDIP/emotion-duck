@@ -17,6 +17,8 @@ import time
 from datetime import date
 from pathlib import Path
 
+import tricks
+
 SAVE_FILE = Path(__file__).parent / "pet.json"
 
 UNLOCK = {"rps": 5, "come": 7}            # 기능별로 열리는 레벨
@@ -38,7 +40,8 @@ EFFECTS = {
     "gesture": (+3, 0, 3),
     "scan":  (+3, -10, 15),
     "goto":  (+4, -8, 10),
-    "minigame": (+6, -5, 14),   # 점수 비율만큼 행복·경험치를 준다
+    "minigame": (+6, -5, 14),
+    "trick": (+4, -3, 8),   # 점수 비율만큼 행복·경험치를 준다
 }
 
 GAMES = {"mugunghwa": "무궁화 꽃이 피었습니다", "dance": "따라 춤추기", "fetch": "공 찾아오기"}   # 로봇이 직접 하는 놀이 (robotgames.py)
@@ -79,6 +82,12 @@ def iya(word):
     return word + ("이야" if 0 <= code < 11172 and code % 28 else "야")
 
 
+def eul(word):
+    """받침이 있으면 '을', 없으면 '를' (꾸벅 인사를 / 나만의 개인기를)"""
+    code = ord(word[-1]) - 0xAC00
+    return word + ("을" if 0 <= code < 11172 and code % 28 else "를")
+
+
 def title_of(affection):
     i = max(k for k, (at, _) in enumerate(TITLES) if affection >= at)
     at, name = TITLES[i]
@@ -112,6 +121,7 @@ class PetGame:
         self.home = home
         self.room = room
         self.robotgames = None             # server.py 가 RobotGames 를 만들어 넣는다
+        self.trainer = None                # server.py 가 TrickTrainer 를 만들어 넣는다 (개인기 훈련)
         self.on_change = on_change         # 상태가 바뀌면 앱에 알리기
         self.xp_boost = xp_boost           # 발표 시연용: 경험치 배수
         self.lock = threading.RLock()
@@ -145,6 +155,12 @@ class PetGame:
                 "slot_names": SLOT_NAMES,
                 "games": {g: {"name": n, "left": max(0, GAME_REWARDS_PER_DAY - s["game_plays"].get(g, 0)),
                               "best": s["best"].get(g, 0)} for g, n in GAMES.items()},
+                "tricks": [{"id": t, "name": n, "icon": ic, "progress": s["tricks"].get(t, 0),
+                            "learned": s["tricks"].get(t, 0) >= tricks.NEED} for t, (n, ic, _) in tricks.TRICKS.items()],
+                "custom": {"moves": s["custom"], "progress": s["tricks"].get("custom", 0),
+                           "learned": bool(s["custom"]) and s["tricks"].get("custom", 0) >= tricks.NEED},
+                "moves": [{"id": m, "name": n, "icon": ic} for m, (n, ic) in tricks.MOVES.items()],
+                "trick": self.trainer.status if self.trainer else None,
             }
 
     # ---------- 행동 ----------
@@ -154,7 +170,7 @@ class PetGame:
                 result = self._do_hello()
                 self._save()
                 return result
-            if self.s["sleeping"] and action not in ("pet", "wake", "sleep", "rename", "equip", "seen_items"):
+            if self.s["sleeping"] and action not in ("pet", "wake", "sleep", "rename", "equip", "seen_items", "custom_save"):
                 return self._result(False, "쿨쿨 자는 중이에요. 화면을 눌러 깨워 주세요")
             handler = getattr(self, "_do_" + action, None)
             if handler is None:
@@ -332,6 +348,67 @@ class PetGame:
         self.s["new_items"] = []
         return self._result(True, None)
 
+    # ---------- 개인기 훈련 ----------
+    def _trick_def(self, trick_id):
+        if trick_id == "custom":
+            return "나만의 개인기", list(self.s["custom"])
+        if trick_id not in tricks.TRICKS:
+            raise ValueError("모르는 개인기")
+        name, _, moves = tricks.TRICKS[trick_id]
+        return name, moves
+
+    def _do_trick(self, id, mode="practice"):
+        name, moves = self._trick_def(id)
+        progress = self.s["tricks"].get(id, 0)
+        if mode == "show" and progress < tricks.NEED:
+            return self._result(False, "아직 못 배웠어요. 먼저 연습시켜 주세요")
+        if self.s["energy"] < TIRED:
+            return self._refuse_tired()
+        chance = min(0.95, 0.6 + 0.15 * progress)      # 처음에도 반쯤은 잘하고, 칭찬받을수록 더 잘한다
+        self.trainer.start(id, name, moves, mode, chance)
+        return self._result(True, None)
+
+    def _do_trick_praise(self):
+        ok = self.trainer.praise()
+        return self._result(ok, None if ok else "지금은 칭찬할 때가 아니에요")
+
+    def _do_custom_save(self, moves):
+        moves = [m for m in moves if m in tricks.MOVES][:tricks.MAX_CUSTOM]
+        if moves != self.s["custom"]:
+            self.s["custom"] = moves
+            self.s["tricks"]["custom"] = 0               # 동작이 바뀌면 처음부터 다시 배운다
+        self.engine.feel("thumbs_up", source="나만의 개인기",
+                         speech="새 개인기 저장! 연습시켜 줘 🎬" if moves else "나만의 개인기를 비웠어요")
+        return self._result(True, None)
+
+    def trick_result(self, trick_id, mode, praised, clumsy):
+        """TrickTrainer 가 개인기를 마치면 부른다 (다른 스레드)."""
+        with self.lock:
+            name, _ = self._trick_def(trick_id)
+            if mode == "show":
+                self._apply("gesture")
+                self._hold("happy")
+                self.engine.feel("trick_show", source="개인기", speech=f"{name} 어땠어? 😎")
+            elif praised and not clumsy:
+                n = self.s["tricks"].get(trick_id, 0) + 1
+                self.s["tricks"][trick_id] = n
+                self._apply("trick")
+                if n == tricks.NEED:
+                    self.s["affection"] = min(100, self.s["affection"] + 3)
+                    self._hold("love")
+                    self.engine.feel("trick_learned", source="개인기", speech=f"{eul(name)} 배웠어! 이제 언제든 보여 줄게 💡 (호감도 +3)")
+                else:
+                    self._hold("happy")
+                    self.engine.feel("trick_praised", source="개인기", speech=f"칭찬 받았다! ({min(n, tricks.NEED)}/{tricks.NEED}) 😊")
+            elif praised and clumsy:
+                self._hold("surprised")
+                self.engine.feel("trick_confused", source="개인기", speech="어… 방금 건 어설펐는데? 헷갈려 🤔")
+            else:
+                self._hold("sad")
+                self.engine.feel("trick_unpraised", source="개인기", speech="음… 다시 연습해 볼게")
+            self._save()
+        self.on_change(self.snapshot())
+
     def _do_rename(self, name):
         name = str(name).strip()[:10]
         if not name:
@@ -344,6 +421,8 @@ class PetGame:
     def _do_gesture(self, name):
         """손짓 인식 코드에서 부른다. 가위바위보 대기 중이면 그 손으로 승부한다."""
         self.last_gesture = name
+        if name == "thumbs_up" and self.trainer and self.trainer.praise():   # 개인기 칭찬 기다리는 중
+            return self._result(True, None)
         if name in HANDS and time.time() < self.rps_open_until:
             return self._do_rps(hand=name)
         if name in GESTURES and not self.s["sleeping"]:
@@ -439,7 +518,7 @@ class PetGame:
         base = {"name": "오리", "level": 1, "xp": 0, "happy": 70, "energy": 80, "sleeping": False,
                 "day": date.today().isoformat(), "snacks_today": 0, "saved_at": time.time(),
                 "affection": 5, "game_plays": {}, "best": {}, "hello_day": None,
-                "look": dict(DEFAULT_LOOK), "new_items": []}
+                "look": dict(DEFAULT_LOOK), "new_items": [], "tricks": {}, "custom": []}
         try:
             saved = json.loads(SAVE_FILE.read_text(encoding="utf-8"))
         except (OSError, ValueError):

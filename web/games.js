@@ -34,8 +34,89 @@ window.Play = (() => {
       const meta = document.querySelector(`[data-meta="${g}"]`);
       if (meta) meta.innerHTML = `<span>최고 ${info.best}</span><span class="${info.left ? "left" : "none"}">${info.left ? `💗 ${info.left}번` : "오늘 보상 끝"}</span>`;
     }
+    renderTricks(p);
   }
   function show() { if (pet) update(pet); }
+
+  // =====================================================================
+  // 개인기 훈련 · 나만의 개인기
+  // =====================================================================
+  let draft = null, dirty = false, lastKey = "", lastPhase = "idle";
+  function pips(n) {
+    const box = h("span", "pips");
+    for (let i = 0; i < 3; i++) box.append(h("i", i < n ? "on" : ""));
+    box.setAttribute("aria-label", `칭찬 ${Math.min(n, 3)}/3`);
+    return box;
+  }
+  // 로봇이 하는 중이면 무엇을 하는지, 끝나면 👍 칭찬 버튼과 6초 막대
+  function trickPanel(t) {
+    const box = h("div", "trick-panel " + t.phase);
+    box.append(h("p", null, t.message));
+    if (t.phase === "judge") {
+      const b = h("button", "btn big praise", "👍 잘했어!");
+      b.addEventListener("click", async () => { Fx.sound("happy"); Fx.buzz(20); await act("trick_praise"); });
+      const bar = h("span", "judge-timer"); const fill = h("i"); fill.style.width = `${(t.left / 6) * 100}%`; bar.append(fill);
+      box.append(b, bar);
+    }
+    return box;
+  }
+  function renderTricks(p) {
+    if (!p.tricks) return;
+    const t = p.trick || { phase: "idle" };
+    const busy = t.phase !== "idle";
+    if (t.phase === "judge" && lastPhase !== "judge") { Fx.sound("tap"); Fx.buzz(30); }
+    lastPhase = t.phase;
+    if (!dirty) draft = [...p.custom.moves];
+    const key = JSON.stringify([p.tricks, p.custom, t, draft, dirty, p.moves.length]);
+    if (key === lastKey) return;
+    lastKey = key;
+
+    $("tricks").replaceChildren(...p.tricks.map((tr) => {
+      const card = h("div", "trick-card" + (tr.learned ? " learned" : "") + (t.active === tr.id ? " active" : ""));
+      const row = h("div", "trick-row");
+      const txt = h("span", "trick-txt");
+      txt.append(h("b", null, tr.name), tr.learned ? h("span", "learned-tag", "배웠어요 ✓") : pips(tr.progress));
+      const btn = h("button", "btn " + (tr.learned ? "show" : "primary"), tr.learned ? "🎬 보여 줘" : "연습");
+      btn.disabled = busy;
+      btn.addEventListener("click", () => { Fx.sound("tap"); act("trick", { id: tr.id, mode: tr.learned ? "show" : "practice" }); });
+      row.append(h("span", "trick-ico", tr.icon), txt, btn);
+      card.append(row);
+      if (t.active === tr.id) card.append(trickPanel(t));
+      return card;
+    }));
+
+    const name = (id) => p.moves.find((m) => m.id === id);
+    $("move-palette").replaceChildren(...p.moves.map((m) => {
+      const b = h("button", "move");
+      b.append(h("span", null, m.icon), h("small", null, m.name));
+      b.disabled = draft.length >= 6;
+      b.addEventListener("click", () => { draft.push(m.id); dirty = true; Fx.sound("tap"); renderTricks(pet); });
+      return b;
+    }));
+    const slots = [];
+    for (let i = 0; i < 6; i++) {
+      const m = draft[i] && name(draft[i]);
+      const b = h("button", "slot" + (m ? " filled" : ""), m ? m.icon : "");
+      b.setAttribute("aria-label", m ? `${i + 1}번째 ${m.name} 빼기` : `${i + 1}번째 빈칸`);
+      if (m) b.addEventListener("click", () => { draft.splice(i, 1); dirty = true; renderTricks(pet); });
+      else b.disabled = true;
+      slots.push(b);
+    }
+    $("move-slots").replaceChildren(...slots);
+    $("custom-save").disabled = !dirty;
+    $("custom-practice").disabled = busy || dirty || !p.custom.moves.length || p.custom.learned;
+    $("custom-show").disabled = busy || dirty || !p.custom.learned;
+    $("custom-status").textContent = dirty ? "저장하지 않은 변경이 있어요"
+      : !p.custom.moves.length ? "동작을 담고 저장한 뒤 연습시켜 보세요"
+      : p.custom.learned ? "배웠어요 ✓ 언제든 보여 줄 수 있어요" : `칭찬 ${p.custom.progress}/3 · 연습시켜 주세요`;
+    $("custom-judge").replaceChildren(...(t.active === "custom" ? [trickPanel(t)] : []));
+  }
+  $("custom-save").addEventListener("click", async () => {
+    const r = await act("custom_save", { moves: draft });
+    if (r.ok) { dirty = false; lastKey = ""; Fx.sound("happy"); }
+  });
+  $("custom-practice").addEventListener("click", () => act("trick", { id: "custom", mode: "practice" }));
+  $("custom-show").addEventListener("click", () => act("trick", { id: "custom", mode: "show" }));
 
   // =====================================================================
   // 놀이 소개

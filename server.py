@@ -28,6 +28,9 @@
   ball_register   {}               지금 카메라 가운데 보이는 색을 '공'으로 기억 (공 찾아오기)
   act hello       {}               앱을 열 때 인사 (그날 첫 방문 호감도 +2)
   cue             {color, beep?}   게임 신호: 로봇 불빛 색 + 삑
+  act trick       {id, mode}       개인기: id=bow/spin/dance/wiggle/custom, mode=practice(연습)/show(보여 줘)
+  act trick_praise {}              개인기 칭찬 (카메라 손짓 thumbs_up 도 같은 일)
+  act custom_save {moves}          나만의 개인기 저장 (동작 최대 6개)
 
 GET /stream      기분·집 찾기 상태를 실시간 전송 (Server-Sent Events)
 GET /camera.jpg  로봇 카메라 화면 한 장
@@ -53,6 +56,7 @@ from game import PetGame
 from home import Camera, HomeFinder
 from robotgames import RobotGames
 from roommap import RoomMap
+from tricks import TrickTrainer
 from robot import RobotBody
 
 WEB_DIR = Path(__file__).parent / "web"
@@ -302,6 +306,8 @@ def main():
                         on_status=lambda st: broadcast({"type": "rgame", "rgame": st}),
                         on_finish=lambda g, s, m: game.act("minigame", game=g, score=s, max_score=m))
     game.robotgames = rgames
+    game.trainer = TrickTrainer(body, on_status=lambda st: broadcast({"type": "pet", "pet": game.snapshot()}),
+                                on_result=game.trick_result)
     print("[home] " + ("흉내 모드 (카메라 또는 OpenCV 없음)" if home.simulated else "카메라 연결됨"))
     threading.Thread(target=tick_loop, daemon=True).start()
     server = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)

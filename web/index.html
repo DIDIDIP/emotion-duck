@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#fbefe9">
+<meta name="color-scheme" content="light">
 <title>감정 오리</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <link rel="stylesheet" href="style.css">
@@ -150,6 +151,24 @@
         <span class="g-txt"><b>공 찾아오기</b><span>공을 굴리면 로봇이 찾아서 달려가요</span></span>
         <span class="g-meta" data-meta="fetch"></span>
       </button>
+    </div>
+
+    <h3 class="play-h">🎓 개인기 훈련</h3>
+    <p class="hint trick-hint">"연습"을 누르면 로봇이 해 봐요. 잘했으면 6초 안에 👍 엄지 척! 3번 칭찬받으면 배워요.</p>
+    <div id="tricks" class="tricks"></div>
+
+    <h3 class="play-h">🎬 나만의 개인기</h3>
+    <div class="custom-card">
+      <p class="hint">동작을 순서대로 담고(최대 6개), 담긴 걸 누르면 빠져요.</p>
+      <div id="move-palette" class="move-palette"></div>
+      <div id="move-slots" class="move-slots" aria-label="담은 동작"></div>
+      <div class="custom-actions">
+        <button id="custom-save" class="btn">💾 저장</button>
+        <button id="custom-practice" class="btn primary">연습</button>
+        <button id="custom-show" class="btn">🎬 보여 줘</button>
+      </div>
+      <p id="custom-status" class="hint center"></p>
+      <div id="custom-judge"></div>
     </div>
   </section>
 

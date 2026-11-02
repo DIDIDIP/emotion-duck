@@ -53,7 +53,10 @@
     level_up: [0.7, 0.6, 0.05, "celebrate", "레벨 업!"], game_great: [0.7, 0.5, 0.05, "celebrate", "최고야!"],
     game_good: [0.4, 0.3, 0.03, "proud", "재밌었다!"], game_try: [0.2, 0, 0.02, "content", "괜찮아, 즐거웠어!"],
     affection_up: [0.8, 0.5, 0.06, "celebrate", "우리 더 친해졌어!"], hello: [0.3, 0.2, 0.02, "greet", "안녕!"],
-    dress_up: [0.4, 0.3, 0.02, "proud", "어때? 잘 어울려?"], too_tired: [-0.1, -0.4, 0, null, "너무 졸려… 재워 줘"],
+    dress_up: [0.4, 0.3, 0.02, "proud", "어때? 잘 어울려?"],
+    trick_show: [0.5, 0.5, 0.02, "excited", "짠~ 개인기!"], trick_praised: [0.5, 0.3, 0.03, "proud", "칭찬 받았다!"],
+    trick_learned: [0.8, 0.5, 0.06, "celebrate", "개인기를 배웠어!"], trick_confused: [-0.1, 0.4, 0, null, "헷갈려…"],
+    trick_unpraised: [-0.2, -0.1, 0, null, "다시 연습해 볼게"], too_tired: [-0.1, -0.4, 0, null, "너무 졸려… 재워 줘"],
     lonely: [-0.3, -0.1, 0, "sad", "심심해… 놀아 줘"],
     map_scan: [0.1, 0.4, 0, null, "방을 한 바퀴 둘러볼게! 빙글빙글~"], map_scanned: [0.4, 0.2, 0.02, "proud", "다 봤어! 지도에서 갈 곳을 골라 줘"],
     map_go: [0.2, 0.4, 0, null, "거기로 갈게!"], map_arrived: [0.5, 0, 0.03, "content", "도착! 여기 맞지?"],
@@ -107,7 +110,14 @@
   const UNLOCK = { rps: 5, come: 7 };
   const XP_BOOST = 3;   // 체험판은 금방 레벨이 오르도록 경험치 3배
   const EFFECTS = { pet: [4, 0, 3], snack: [15, 10, 15], rps: [6, -8, 10], come: [5, -15, 20], wake: [0, 0, 10],
-    gesture: [3, 0, 3], scan: [3, -10, 15], goto: [4, -8, 10], minigame: [6, -5, 14] };
+    gesture: [3, 0, 3], scan: [3, -10, 15], goto: [4, -8, 10], minigame: [6, -5, 14], trick: [4, -3, 8] };
+  // 개인기 훈련 (tricks.py)
+  const NEED = 3, PRAISE_SECS = 6, MAX_CUSTOM = 6;
+  const TRICK_MOVES = { beep: ["삐!", "🔔"], bow: ["꾸벅", "🙇"], spin: ["빙글", "🌀"], back: ["뒤로", "⬇️"],
+    forward: ["앞으로", "⬆️"], left: ["왼쪽 돌기", "⬅️"], right: ["오른쪽 돌기", "➡️"], wiggle: ["흔들기", "〰️"] };
+  const TRICKS = { bow: ["꾸벅 인사", "🙇", ["bow", "beep"]], spin: ["빙글 돌기", "🌀", ["spin", "beep"]],
+    dance: ["신나는 춤", "💃", ["left", "right", "wiggle", "bow", "beep"]], wiggle: ["엉덩이 흔들기", "🐕", ["wiggle", "wiggle", "beep"]] };
+  const MOVE_SECS = { beep: 0.5, bow: 1.2, spin: 1.4, back: 0.6, forward: 0.6, left: 0.7, right: 0.7, wiggle: 1.0 };
   const GAMES = { mugunghwa: "무궁화 꽃이 피었습니다", dance: "따라 춤추기", fetch: "공 찾아오기" };
   const HANDS = { rock: "✊ 바위", scissors: "✌️ 가위", paper: "🖐 보" };
   const BEATS = { rock: "scissors", scissors: "paper", paper: "rock" };
@@ -126,6 +136,7 @@
   };
   const SLOT_NAMES = { led: "화면 빛", body: "몸 색", hat: "머리 장식", cheek: "볼", theme: "배경" };
   const DEFAULT_LOOK = Object.fromEntries(Object.entries(ITEMS).map(([k, v]) => [k, v[0][0]]));
+  const eul = (w) => { const c = w.charCodeAt(w.length - 1) - 0xac00; return w + (c >= 0 && c < 11172 && c % 28 ? "을" : "를"); };
   const iya = (w) => { const c = w.charCodeAt(w.length - 1) - 0xac00; return w + (c >= 0 && c < 11172 && c % 28 ? "이야" : "야"); };
   function titleOf(a) {
     let i = 0;
@@ -139,7 +150,7 @@
     s: null, faceHold: null, rpsUntil: 0, lastGesture: null, lastPet: 0, lastLonely: 0, lastHello: 0, acc: { happy: 0, energy: 0 },
     load() {
       const base = { name: "오리", level: 1, xp: 0, happy: 70, energy: 80, sleeping: false, day: today(), snacks_today: 0,
-        affection: 5, game_plays: {}, best: {}, hello_day: null, look: { ...DEFAULT_LOOK }, new_items: [] };
+        affection: 5, game_plays: {}, best: {}, hello_day: null, look: { ...DEFAULT_LOOK }, new_items: [], tricks: {}, custom: [] };
       try { Object.assign(base, JSON.parse(localStorage.getItem(SAVE) || "{}")); } catch {}
       base.look = { ...DEFAULT_LOOK, ...base.look };
       this.s = base;
@@ -170,6 +181,10 @@
           slot, id, name, level, unlocked: s.level >= level, new: s.new_items.includes(`${slot}:${id}`) }))),
         slot_names: SLOT_NAMES,
         games: Object.fromEntries(Object.entries(GAMES).map(([g, n]) => [g, { name: n, left: Math.max(0, 3 - (s.game_plays[g] || 0)), best: s.best[g] || 0 }])),
+        tricks: Object.entries(TRICKS).map(([id, [name, icon]]) => ({ id, name, icon, progress: s.tricks[id] || 0, learned: (s.tricks[id] || 0) >= NEED })),
+        custom: { moves: s.custom, progress: s.tricks.custom || 0, learned: s.custom.length > 0 && (s.tricks.custom || 0) >= NEED },
+        moves: Object.entries(TRICK_MOVES).map(([id, [name, icon]]) => ({ id, name, icon })),
+        trick: { ...trainer.status },
       };
     },
     hold(face) { this.faceHold = [face, now() + 4]; },
@@ -193,7 +208,7 @@
     refuseTired() { this.hold("tired"); engine.feel("too_tired"); return this.res(false, "에너지가 부족해요. 먼저 재워 주세요"); },
     act(action, p = {}) {
       if (action === "hello") { const r = this.hello(); this.save(); return r; }
-      if (this.s.sleeping && !["pet", "wake", "sleep", "rename", "equip", "seen_items"].includes(action)) {
+      if (this.s.sleeping && !["pet", "wake", "sleep", "rename", "equip", "seen_items", "custom_save"].includes(action)) {
         return this.res(false, "쿨쿨 자는 중이에요. 화면을 눌러 깨워 주세요");
       }
       const fn = this["do_" + action];
@@ -308,7 +323,47 @@
       engine.feel("thumbs_up", "앱", `내 이름은 ${name}! 마음에 들어 💕`);
       return this.res(true, null);
     },
-    do_gesture({ name }) { this.lastGesture = name; return this.res(true, null); },
+    do_gesture({ name }) {
+      this.lastGesture = name;
+      if (name === "thumbs_up") trainer.praise();
+      return this.res(true, null);
+    },
+    trickDef(id) {
+      if (id === "custom") return ["나만의 개인기", [...this.s.custom]];
+      if (!TRICKS[id]) throw new Error("모르는 개인기");
+      return [TRICKS[id][0], TRICKS[id][2]];
+    },
+    do_trick({ id, mode = "practice" }) {
+      const [name, moves] = this.trickDef(id);
+      const progress = this.s.tricks[id] || 0;
+      if (mode === "show" && progress < NEED) return this.res(false, "아직 못 배웠어요. 먼저 연습시켜 주세요");
+      if (this.s.energy < 15) return this.refuseTired();
+      trainer.start(id, name, moves, mode, Math.min(0.95, 0.6 + 0.15 * progress));
+      return this.res(true, null);
+    },
+    do_trick_praise() { const ok = trainer.praise(); return this.res(ok, ok ? null : "지금은 칭찬할 때가 아니에요"); },
+    do_custom_save({ moves }) {
+      moves = (moves || []).filter((m) => TRICK_MOVES[m]).slice(0, MAX_CUSTOM);
+      if (JSON.stringify(moves) !== JSON.stringify(this.s.custom)) { this.s.custom = moves; this.s.tricks.custom = 0; }
+      engine.feel("thumbs_up", "나만의 개인기", moves.length ? "새 개인기 저장! 연습시켜 줘 🎬" : "나만의 개인기를 비웠어요");
+      return this.res(true, null);
+    },
+    trickResult(id, mode, praised, clumsy) {
+      const [name] = this.trickDef(id);
+      if (mode === "show") { this.apply("gesture"); this.hold("happy"); engine.feel("trick_show", "개인기", `${name} 어땠어? 😎`); }
+      else if (praised && !clumsy) {
+        const n = (this.s.tricks[id] || 0) + 1;
+        this.s.tricks[id] = n;
+        this.apply("trick");
+        if (n === NEED) {
+          this.s.affection = Math.min(100, this.s.affection + 3); this.hold("love");
+          engine.feel("trick_learned", "개인기", `${eul(name)} 배웠어! 이제 언제든 보여 줄게 💡 (호감도 +3)`);
+        } else { this.hold("happy"); engine.feel("trick_praised", "개인기", `칭찬 받았다! (${Math.min(n, NEED)}/${NEED}) 😊`); }
+      } else if (praised && clumsy) { this.hold("surprised"); engine.feel("trick_confused", "개인기", "어… 방금 건 어설펐는데? 헷갈려 🤔"); }
+      else { this.hold("sad"); engine.feel("trick_unpraised", "개인기", "음… 다시 연습해 볼게"); }
+      this.save();
+      broadcast({ type: "pet", pet: this.snapshot() });
+    },
     tick(dt) {
       const s = this.s, a = this.acc;
       if (s.sleeping) {
@@ -477,9 +532,42 @@
   // =====================================================================
   const MOVES = { left: "왼쪽 돌기", right: "오른쪽 돌기", forward: "앞으로", back: "뒤로", nod: "끄덕끄덕" };
   const CHANT = "무궁화꽃이피었습니다";
+  // ---------- 개인기 훈련 흉내 (tricks.py) ----------
+  const trainer = {
+    status: { active: null, mode: null, phase: "idle", message: "", left: 0 }, praised: false, running: false,
+    set(kw) { this.status = { ...this.status, ...kw }; broadcast({ type: "pet", pet: pet.snapshot() }); },
+    praise() { if (this.status.phase !== "judge") return false; this.praised = true; return true; },
+    start(id, name, moves, mode, chance) {
+      if (this.running || games.busy() || room.busy()) throw new Error("지금 다른 걸 하는 중이에요");
+      if (!moves.length) throw new Error("먼저 동작을 담아 주세요");
+      this.running = true; this.praised = false;
+      const clumsy = mode === "practice" && Math.random() > chance;
+      this._run(id, name, moves, mode, clumsy);
+    },
+    async _run(id, name, moves, mode, clumsy) {
+      const todo = clumsy ? moves.slice(0, Math.max(1, Math.floor(moves.length / 2))) : moves;
+      this.set({ active: id, mode, phase: "doing", left: 0, message: mode === "practice" ? `${name} 해 볼게요! 로봇을 보세요 👀` : `${name}! 짠~` });
+      for (const mv of todo) {
+        this.set({ message: `${TRICK_MOVES[mv][1]} ${TRICK_MOVES[mv][0]}…` });
+        await wait(MOVE_SECS[mv] * 1000);
+      }
+      if (clumsy) { this.set({ message: "🤔 갸웃…" }); await wait(700); }
+      if (mode === "show") { this.running = false; this.set({ active: null, phase: "idle", message: "" }); pet.trickResult(id, mode, false, false); return; }
+      const hint = clumsy ? "(어설프게 하다 멈췄어요 🤔)" : "(제대로 했어요 ✨)";
+      for (let left = PRAISE_SECS; left > 0 && !this.praised; left--) {
+        this.set({ phase: "judge", left, message: `잘했으면 👍 엄지 척! ${hint}` });
+        for (let k = 0; k < 10 && !this.praised; k++) await wait(100);
+      }
+      const praised = this.praised;
+      this.running = false;
+      this.set({ active: null, phase: "idle", message: "", left: 0 });
+      pet.trickResult(id, mode, praised, clumsy);
+    },
+  };
+
   const games = {
     status: { game: null, phase: "idle" }, token: 0, inputs: [], wake: null,
-    busy() { return !!this.status.game && !this.status.done && this.status.phase !== "idle"; },
+    busy() { return (!!this.status.game && !this.status.done && this.status.phase !== "idle") || trainer.running; },
     set(kw) { this.status = { ...this.status, ...kw }; broadcast({ type: "rgame", rgame: { ...this.status } }); },
     start(game) {
       if (this.busy() || room.busy()) throw new Error("지금 다른 걸 하는 중이에요");
