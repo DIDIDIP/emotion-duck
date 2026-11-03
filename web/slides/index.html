@@ -114,7 +114,7 @@
 <script>
 (async () => {
   const $ = (id) => document.getElementById(id);
-  const slides = await (await fetch("slides.json")).json();
+  const slides = await (await fetch("slides.json", { cache: "no-cache" })).json();
   const N = slides.length;
   const presenter = new URLSearchParams(location.search).has("presenter");
   const chan = "BroadcastChannel" in window ? new BroadcastChannel("emotion-duck-slides") : null;
