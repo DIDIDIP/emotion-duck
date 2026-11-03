@@ -23,7 +23,7 @@
   "img": "img/5.jpg?v=97a39943",
   "videos": [
    {
-    "src": "video/media1.mp4?v=95927cf0",
+    "src": "video/media1_t2000.mp4?v=fb5873d3",
     "x": 4.5,
     "y": 22.667,
     "w": 60.0,
@@ -66,7 +66,7 @@
   "notes": "세 번째는 경기 반응입니다. 축구 골이나 야구 홈런 장면이 나오면 로봇이 함께 기뻐하며 세리머니를 합니다. 같이 경기를 보는 친구 같은 느낌을 주고 싶었습니다."
  },
  {
-  "img": "img/8.jpg?v=f55d6a65",
+  "img": "img/8.jpg?v=d9a5d6bb",
   "videos": [
    {
     "src": "video/media5.mp4?v=31a87281",
